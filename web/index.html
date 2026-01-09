@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPipe - Virtual Printer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: monospace;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .jobs-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .job-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .job-id {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status.created { background: #e0e0e0; color: #666; }
+        .status.queued { background: #fff3cd; color: #856404; }
+        .status.scheduled { background: #cfe2ff; color: #084298; }
+        .status.spooling { background: #d1ecf1; color: #0c5460; }
+        .status.printing { background: #cff4fc; color: #055160; }
+        .status.completed { background: #d1e7dd; color: #0f5132; }
+        .status.failed { background: #f8d7da; color: #842029; }
+        .status.canceled { background: #e2e3e5; color: #41464b; }
+        
+        .job-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .btn-small {
+            padding: 6px 15px;
+            font-size: 14px;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        
+        .alert.success {
+            background: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+        
+        .alert.error {
+            background: #f8d7da;
+            color: #842029;
+            border: 1px solid #f5c2c7;
+        }
+        
+        .output-preview {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖨️ PrintPipe</h1>
+            <p>Virtual Printer Driver with Static front End </p>
+        </div>
+        
+        <div class="grid-2">
+            <div class="card">
+                <h2>📄 Create Print Job</h2>
+                <div id="createAlert"></div>
+                <form id="createForm">
+                    <div class="form-group">
+                        <label for="jobName">Job Name *</label>
+                        <input type="text" id="jobName" placeholder="e.g., invoice-2024" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="jobPayload">Content to Print *</label>
+                        <textarea id="jobPayload" placeholder="Enter the content you want to print..." required></textarea>
+                    </div>
+                    <button type="submit">Create Job</button>
+                </form>
+            </div>
+            
+            <div class="card">
+                <h2>📋 Active Jobs</h2>
+                <button onclick="refreshJobs()" class="btn-small">🔄 Refresh</button>
+                <div id="jobsList" style="margin-top: 15px;">
+                    <p style="color: #666;">Loading jobs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        
+        // Create job form submission
+        document.getElementById('createForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('jobName').value;
+            const payload = document.getElementById('jobPayload').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/jobs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, payload })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('createAlert', 'success', `Job created! ID: ${data.job_id}`);
+                    document.getElementById('createForm').reset();
+                    refreshJobs();
+                } else {
+                    showAlert('createAlert', 'error', data.error || 'Failed to create job');
+                }
+            } catch (error) {
+                showAlert('createAlert', 'error', 'Network error: ' + error.message);
+            }
+        });
+        
+        // Submit job for processing
+        async function submitJob(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/jobs/${jobId}/submit`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert(`Job ${jobId} submitted for processing!`);
+                    refreshJobs();
+                } else {
+                    alert('Failed to submit: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        // View job output
+        async function viewOutput(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/jobs/${jobId}/output`);
+                
+                if (response.ok) {
+                    const output = await response.text();
+                    const preview = document.createElement('div');
+                    preview.className = 'output-preview';
+                    preview.textContent = output;
+                    
+                    const modal = document.createElement('div');
+                    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;';
+                    modal.onclick = () => modal.remove();
+                    
+                    const content = document.createElement('div');
+                    content.className = 'card';
+                    content.style.maxWidth = '800px';
+                    content.style.maxHeight = '80vh';
+                    content.style.overflow = 'auto';
+                    content.onclick = (e) => e.stopPropagation();
+                    content.innerHTML = `<h2>Job Output: ${jobId}</h2>`;
+                    content.appendChild(preview);
+                    
+                    modal.appendChild(content);
+                    document.body.appendChild(modal);
+                } else {
+                    alert('Output not available yet');
+                }
+            } catch (error) {
+                alert('Error fetching output: ' + error.message);
+            }
+        }
+        
+        // Refresh jobs list
+        async function refreshJobs() {
+            try {
+                const response = await fetch(`${API_BASE}/jobs`);
+                const jobs = await response.json();
+                
+                const jobsList = document.getElementById('jobsList');
+                
+                if (jobs.length === 0) {
+                    jobsList.innerHTML = '<p style="color: #666;">No jobs yet. Create one above!</p>';
+                    return;
+                }
+                
+                jobsList.innerHTML = jobs.map(job => `
+                    <div class="job-item">
+                        <div class="job-header">
+                            <span class="job-id">${job.job_id}</span>
+                            <span class="status ${job.state}">${job.state}</span>
+                        </div>
+                        <div style="color: #666; margin-bottom: 5px;">
+                            <strong>Name:</strong> ${job.name}
+                        </div>
+                        <div style="color: #666; font-size: 12px; margin-bottom: 10px;">
+                            ${job.file_exists ? '✅ File generated' : '⏳ Processing...'}
+                        </div>
+                        <div class="job-actions">
+                            ${job.state === 'created' ? 
+                                `<button class="btn-small" onclick="submitJob('${job.job_id}')">▶️ Submit</button>` : 
+                                ''}
+                            ${job.file_exists ? 
+                                `<button class="btn-small" onclick="viewOutput('${job.job_id}')">👁️ View Output</button>` : 
+                                ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('jobsList').innerHTML = 
+                    `<p style="color: red;">Error loading jobs: ${error.message}</p>`;
+            }
+        }
+        
+        function showAlert(elementId, type, message) {
+            const alert = document.getElementById(elementId);
+            alert.className = `alert ${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 5000);
+        }
+        
+        // Auto-refresh jobs every 2 seconds
+        setInterval(refreshJobs, 2000);
+        
+        // Initial load
+        refreshJobs();
+    </script>
+</body>
+</html>
